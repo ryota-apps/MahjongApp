@@ -64,7 +64,7 @@ header::after{content:'';display:block;height:1px;background:var(--ink);margin-t
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 @media(max-width:440px){.g2{grid-template-columns:1fr;}.g3,.g4{grid-template-columns:1fr 1fr;}}
 .span2{grid-column:1/-1;}
-.fg{display:flex;flex-direction:column;gap:4px;}
+.fg{display:flex;flex-direction:column;gap:4px;min-width:0;}
 .fg label{font-size:0.68rem;letter-spacing:0.16em;color:#777;}
 .fg input,.fg select,.fg textarea{font-family:'Noto Serif JP',serif;font-size:0.9rem;padding:8px 10px;
   border:1px solid rgba(26,18,8,0.22);border-radius:2px;background:var(--paper);color:var(--ink);outline:none;transition:border-color 0.2s;
