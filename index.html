@@ -2234,9 +2234,9 @@
         if (startDate) rawAll = rawAll.filter((s) => s.date >= startDate);
         if (endDate) rawAll = rawAll.filter((s) => s.date <= endDate);
 
-        const all = withFees
-          ? rawAll.map((s) => ({ ...s, net: getNet(s, true) }))
-          : rawAll;
+        // これから描画に使うデータセット `all` を作成する。
+        // 各セッションの `net` プロパティを、フィルター条件に従った収支で上書きする。
+        const all = rawAll.map(s => ({ ...s, net: getNet(s, withFees) }));
         renderLineChart(all);
         renderDist(
           all.filter((s) => s.players === 4),
