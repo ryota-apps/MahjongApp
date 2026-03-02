@@ -1348,11 +1348,20 @@
       <!-- ===== ANALYSIS ===== -->
       <div class="pane" id="pane-analysis">
         <div class="filter-bar" style="margin-bottom: 13px">
+          <select class="fsel" id="an-players" onchange="renderAnalysis()">
+            <option value="all">全人数</option>
+            <option value="4">四麻</option>
+            <option value="3">三麻</option>
+          </select>
           <select class="fsel" id="an-gametype" onchange="renderAnalysis()">
             <option value="all">全種別</option>
             <option value="free">フリー</option>
             <option value="set">セット</option>
           </select>
+          <select class="fsel" id="an-shop-filter" onchange="renderAnalysis()">
+            <option value="all">全店舗</option>
+          </select>
+          <select class="fsel" id="an-rate" onchange="renderAnalysis()"></select>
           <select class="fsel" id="an-fee" onchange="renderAnalysis()">
             <option value="0">ゲーム代なし</option>
             <option value="1">ゲーム代あり</option>
@@ -1615,6 +1624,7 @@
         document.getElementById("s-rule").innerHTML = sessionOpts;
         document.getElementById("sf-rule").innerHTML = sessionOpts;
         document.getElementById("f-rate").innerHTML = filterOpts;
+        document.getElementById("an-rate").innerHTML = filterOpts;
       }
 
       document.addEventListener("DOMContentLoaded", () => {
@@ -2172,21 +2182,37 @@
       function renderAnalysis() {
         const withFees = document.getElementById("an-fee").value === "1";
         const anGt = document.getElementById("an-gametype").value;
+        const anPlayers = document.getElementById("an-players").value;
+        const anShop = document.getElementById("an-shop-filter").value;
+        const anRate = document.getElementById("an-rate").value;
         const startDate = document.getElementById("an-date-start").value;
         const endDate = document.getElementById("an-date-end").value;
 
         let rawAll = loadSessions();
 
+        // Populate shop filter
+        const shopFilter = document.getElementById("an-shop-filter");
+        const currentShop = anShop;
+        const shops = [...new Set(rawAll.map((s) => s.shop))].sort();
+        shopFilter.innerHTML = '<option value="all">全店舗</option>';
+        shops.forEach((shop) => {
+          const option = document.createElement("option");
+          option.value = shop;
+          option.textContent = shop;
+          shopFilter.appendChild(option);
+        });
+        shopFilter.value = currentShop;
+
+        if (anPlayers !== "all") rawAll = rawAll.filter((s) => s.players == anPlayers);
+        if (anGt !== "all") rawAll = rawAll.filter((s) => (s.gameType || "free") === anGt);
+        if (anShop !== "all") rawAll = rawAll.filter((s) => s.shop === anShop);
+        if (anRate !== "all") rawAll = rawAll.filter((s) => s.rule == anRate);
         if (startDate) rawAll = rawAll.filter((s) => s.date >= startDate);
         if (endDate) rawAll = rawAll.filter((s) => s.date <= endDate);
 
-        const rawFiltered =
-          anGt !== "all"
-            ? rawAll.filter((s) => (s.gameType || "free") === anGt)
-            : rawAll;
         const all = withFees
-          ? rawFiltered.map((s) => ({ ...s, net: getNet(s, true) }))
-          : rawFiltered;
+          ? rawAll.map((s) => ({ ...s, net: getNet(s, true) }))
+          : rawAll;
         renderLineChart(all);
         renderDist(
           all.filter((s) => s.players === 4),
