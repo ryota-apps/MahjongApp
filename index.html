@@ -645,6 +645,42 @@
         letter-spacing: 0.06em;
       }
 
+      /* HISTORY SUMMARY */
+      .hist-summary {
+        background: var(--cream);
+        border: 1px solid rgba(26, 18, 8, 0.14);
+        border-radius: 2px;
+        padding: 10px 14px;
+        margin-bottom: 10px;
+        box-shadow: 2px 2px 0 var(--sh);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 20px;
+        align-items: center;
+      }
+      .hs-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+      }
+      .hs-lbl {
+        font-size: 0.6rem;
+        letter-spacing: 0.12em;
+        color: #aaa;
+      }
+      .hs-val {
+        font-family: "Shippori Mincho", serif;
+        font-size: 0.95rem;
+        font-weight: 700;
+      }
+      .hs-sep {
+        width: 1px;
+        height: 28px;
+        background: rgba(26, 18, 8, 0.1);
+        align-self: center;
+      }
+
       /* ANALYSIS */
       .a-grid {
         display: grid;
@@ -1168,6 +1204,7 @@
             <option value="balL">収支低い順</option>
           </select>
         </div>
+        <div id="history-summary"></div>
         <div id="history-list"></div>
       </div>
 
@@ -1679,11 +1716,49 @@
         else if (fs === "balL")
           data.sort((a, b) => (a.net || a.balance) - (b.net || b.balance));
         const el = document.getElementById("history-list");
+        const sumEl = document.getElementById("history-summary");
         if (!data.length) {
+          sumEl.innerHTML = "";
           el.innerHTML =
             '<div class="empty"><span>🀄</span>記録がありません</div>';
           return;
         }
+
+        // フィルター後サマリー計算
+        let totalGames = 0, sumRank = 0, totalBal = 0;
+        const rankCounts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        const maxPlayers = fp !== "all" ? parseInt(fp) : 4;
+        data.forEach((s) => {
+          for (let p = 1; p <= (s.players || 4); p++) {
+            const c = s.counts[p] || 0;
+            totalGames += c;
+            sumRank += p * c;
+            rankCounts[p] += c;
+          }
+          totalBal += s.net !== undefined ? s.net : s.balance || 0;
+        });
+        const avgRank = totalGames ? (sumRank / totalGames).toFixed(2) : "—";
+        const avgBal = data.length ? Math.round(totalBal / data.length) : 0;
+        const fbal = (v) => (v > 0 ? "+" : "") + v.toLocaleString() + "円";
+        const bclass = (v) => (v > 0 ? "var(--teal)" : v < 0 ? "var(--red)" : "inherit");
+        const rankItems = [1, 2, 3, 4]
+          .filter((p) => fp === "all" ? rankCounts[p] > 0 : p <= maxPlayers)
+          .map((p) => `<div class="hs-item">
+            <span class="hs-lbl" style="color:${COLORS[p]}">${p}着</span>
+            <span class="hs-val" style="color:${COLORS[p]}">${rankCounts[p]}</span>
+          </div>`)
+          .join("");
+        sumEl.innerHTML = `<div class="hist-summary">
+          <div class="hs-item"><span class="hs-lbl">セッション</span><span class="hs-val">${data.length}回</span></div>
+          <div class="hs-item"><span class="hs-lbl">総局数</span><span class="hs-val">${totalGames}局</span></div>
+          <div class="hs-item"><span class="hs-lbl">平均着順</span><span class="hs-val">${avgRank}</span></div>
+          <div class="hs-sep"></div>
+          ${rankItems}
+          <div class="hs-sep"></div>
+          <div class="hs-item"><span class="hs-lbl">収支合計</span><span class="hs-val" style="color:${bclass(totalBal)}">${fbal(totalBal)}</span></div>
+          <div class="hs-item"><span class="hs-lbl">平均収支</span><span class="hs-val" style="color:${bclass(avgBal)}">${fbal(avgBal)}</span></div>
+        </div>`;
+
         const fn = (v) => (v > 0 ? "+" : "") + v.toLocaleString() + "円";
         const bc = (v) => (v > 0 ? "pos" : v < 0 ? "neg" : "zero");
         el.innerHTML = data
