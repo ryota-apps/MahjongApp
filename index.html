@@ -1173,7 +1173,7 @@
             <div class="pt">収支・チップを入力して保存</div>
             <div class="g2" style="margin-bottom: 11px">
               <div class="fg">
-                <label>現金収支（円）</label>
+                <label>最終現金収支（ゲーム代等支払い後）</label>
                 <input
                   type="number"
                   id="s-balance"
@@ -1823,27 +1823,37 @@
         const el = document.getElementById("save-summary");
         const isSet = cur && cur.gameType === "set";
         const hasChips = !!(cur && cur.shopData && cur.shopData.chipUnit);
-        if (!hasChips && !isSet) {
+
+        // セットで場代入力欄があるか、またはチップ機能が有効な場合のみサマリーを表示
+        if (!hasChips && !(isSet && document.getElementById("s-venue-fee"))) {
           el.style.display = "none";
           return;
         }
+
         const cash = parseInt(document.getElementById("s-balance").value) || 0;
-        const chips = hasChips
-          ? parseInt(document.getElementById("s-chips").value) || 0
-          : 0;
+        const chips = hasChips ? parseInt(document.getElementById("s-chips").value) || 0 : 0;
         const unit = hasChips ? cur.shopData.chipUnit : 0;
         const chipVal = chips * unit;
-        const venueFeeEl = document.getElementById("s-venue-fee");
-        const venueFee =
-          isSet && venueFeeEl ? parseInt(venueFeeEl.value) || 0 : 0;
-        const net = cash + chipVal - venueFee;
+        
+        // 純収支は、最終的な現金収支とチップ収支の合計とする
+        const net = cash + chipVal;
+
         const fn = (v) => (v >= 0 ? "+" : "") + v.toLocaleString() + "円";
         el.style.display = "";
-        let html = `現金収支 ${fn(cash)}`;
-        if (hasChips) html += `　＋　チップ ${fn(chipVal)}`;
-        if (isSet && venueFee)
-          html += `　－　場代 ${venueFee.toLocaleString()}円`;
+
+        let html = `最終現金収支 ${fn(cash)}`;
+        if (hasChips) {
+          html += `　＋　チップ収支 ${fn(chipVal)}`;
+        }
         html += `　＝　<strong>純収支 ${fn(net)}</strong>`;
+
+        // セットの場代は参考情報として表示する
+        const venueFeeEl = document.getElementById("s-venue-fee");
+        const venueFee = isSet && venueFeeEl ? parseInt(venueFeeEl.value) || 0 : 0;
+        if (isSet && venueFee > 0) {
+           html += `<br><span style="font-size:0.8em; color: #777;">（参考：入力された場代 ${venueFee.toLocaleString()}円）</span>`;
+        }
+        
         el.innerHTML = html;
       }
 
@@ -1886,7 +1896,8 @@
           cur.gameType === "set"
             ? parseInt(document.getElementById("s-venue-fee").value) || 0
             : 0;
-        const net = balance + chipVal - venueFee;
+        // 純収支(net)は、最終的な現金収支(balance)とチップ収支(chipVal)の合計。場代は含めない。
+        const net = balance + chipVal;
         const sessions = loadSessions();
         sessions.unshift({
           id: Date.now(),
@@ -1942,16 +1953,29 @@
       }
 
       function getNet(s, withFees) {
+        // s.netは、ゲーム代支払い後の「最終現金収支 + チップ収支」
         const net = s.net !== undefined ? s.net : s.balance;
-        if (!withFees || (!s.gameFee && !s.topPrize)) return net;
-        const total = [1, 2, 3, 4]
-          .filter((p) => p <= (s.players || 4))
-          .reduce((sum, p) => sum + (s.counts[p] || 0), 0);
-        return (
-          net -
-          total * (s.gameFee || 0) -
-          (s.counts[1] || 0) * (s.topPrize || 0)
-        );
+
+        if (withFees) {
+          // 「ゲーム代あり」表示の場合:
+          // 既にゲーム代が引かれた後の収支なので、そのまま返す
+          return net;
+        } else {
+          // 「ゲーム代なし」表示の場合:
+          // もしゲーム代がなかったら、という仮の収支を計算するため、
+          // 保存されているゲーム代やトップ賞、セットの場代を純収支に「足し戻す」
+          const totalGames = Object.values(s.counts).reduce(
+            (sum, count) => sum + (count || 0),
+            0,
+          );
+          const fees =
+            totalGames * (s.gameFee || 0) +
+            (s.counts[1] || 0) * (s.topPrize || 0);
+          
+          const venueFee = s.venueFee || 0;
+
+          return net + fees + venueFee;
+        }
       }
 
       function renderHistory() {
