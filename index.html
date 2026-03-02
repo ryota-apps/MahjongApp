@@ -265,6 +265,12 @@
       input[type="date"] {
         -webkit-appearance: none;
         appearance: none;
+        display: block;
+        width: 100%;
+      }
+      input[type="date"]::-webkit-date-and-time-value {
+        width: 100%;
+        text-align: left;
       }
       .fg input:focus,
       .fg select:focus,
