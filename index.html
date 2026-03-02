@@ -1197,6 +1197,10 @@
             <option value="3">三人</option>
           </select>
           <select class="fsel" id="f-rate" onchange="renderHistory()"></select>
+          <select class="fsel" id="f-fee" onchange="renderHistory()">
+            <option value="0">ゲーム代なし</option>
+            <option value="1">ゲーム代あり</option>
+          </select>
           <select class="fsel" id="f-sort" onchange="renderHistory()">
             <option value="new">新しい順</option>
             <option value="old">古い順</option>
@@ -1210,6 +1214,12 @@
 
       <!-- ===== ANALYSIS ===== -->
       <div class="pane" id="pane-analysis">
+        <div class="filter-bar" style="margin-bottom: 13px">
+          <select class="fsel" id="an-fee" onchange="renderAnalysis()">
+            <option value="0">ゲーム代なし</option>
+            <option value="1">ゲーム代あり</option>
+          </select>
+        </div>
         <div class="a-card" style="margin-bottom: 13px">
           <h3>累計純収支の推移</h3>
           <div class="line-chart-wrap" id="an-line"></div>
@@ -1311,6 +1321,19 @@
             <div class="fg">
               <label>チップ種別メモ</label>
               <input type="text" id="sf-chip-note" placeholder="例：赤チップ" />
+            </div>
+          </div>
+
+          <hr class="div" />
+          <span class="section-lbl">ゲーム代・トップ賞（任意）</span>
+          <div class="g2" style="margin-bottom: 14px">
+            <div class="fg">
+              <label>ゲーム代（円/局）</label>
+              <input type="number" id="sf-game-fee" placeholder="例：200" />
+            </div>
+            <div class="fg">
+              <label>トップ賞（円/回）</label>
+              <input type="number" id="sf-top-prize" placeholder="例：300" />
             </div>
           </div>
 
@@ -1668,6 +1691,8 @@
           chipUnit,
           chipVal,
           net,
+          gameFee: (cur.shopData && cur.shopData.gameFee) || 0,
+          topPrize: (cur.shopData && cur.shopData.topPrize) || 0,
           note,
         });
         saveSessions(sessions);
@@ -1703,10 +1728,18 @@
         el.className = "ts-v " + (bal > 0 ? "pos" : bal < 0 ? "neg" : "");
       }
 
+      function getNet(s, withFees) {
+        const net = s.net !== undefined ? s.net : s.balance;
+        if (!withFees || (!s.gameFee && !s.topPrize)) return net;
+        const total = [1,2,3,4].filter(p => p <= (s.players||4)).reduce((sum,p) => sum + (s.counts[p]||0), 0);
+        return net - total * (s.gameFee||0) - (s.counts[1]||0) * (s.topPrize||0);
+      }
+
       function renderHistory() {
         const fp = document.getElementById("f-players").value;
         const fr = document.getElementById("f-rate").value;
         const fs = document.getElementById("f-sort").value;
+        const ff = document.getElementById("f-fee").value === "1";
         let data = loadSessions();
         if (fp !== "all") data = data.filter((s) => s.players == fp);
         if (fr !== "all") data = data.filter((s) => s.rule == fr);
@@ -1735,7 +1768,7 @@
             sumRank += p * c;
             rankCounts[p] += c;
           }
-          totalBal += s.net !== undefined ? s.net : s.balance || 0;
+          totalBal += getNet(s, ff);
         });
         const avgRank = totalGames ? (sumRank / totalGames).toFixed(2) : "—";
         const avgBal = data.length ? Math.round(totalBal / data.length) : 0;
@@ -1778,7 +1811,7 @@
       </div>`,
               )
               .join("");
-            const net = s.net !== undefined ? s.net : s.balance;
+            const net = getNet(s, ff);
             const chipBadge = s.chipVal
               ? `<span class="chip-badge">チップ ${s.chipVal >= 0 ? "+" : ""}${s.chipVal.toLocaleString()}円</span>`
               : "";
@@ -1819,7 +1852,11 @@
       }
 
       function renderAnalysis() {
-        const all = loadSessions();
+        const withFees = document.getElementById("an-fee").value === "1";
+        const rawAll = loadSessions();
+        const all = withFees
+          ? rawAll.map(s => ({ ...s, net: getNet(s, true) }))
+          : rawAll;
         renderLineChart(all);
         renderDist(
           all.filter((s) => s.players === 4),
@@ -2059,10 +2096,14 @@
             const chip = s.chipUnit
               ? `チップ ${s.chipUnit}円/枚${s.chipNote ? " (" + s.chipNote + ")" : ""}`
               : "";
+            const fees = [
+              s.gameFee ? `ゲーム代${s.gameFee}円/局` : "",
+              s.topPrize ? `トップ賞${s.topPrize}円` : "",
+            ].filter(Boolean).join(" ／ ");
             return `<div class="shop-card">
       <div style="flex:1;min-width:0;">
         <div class="sc-name">${esc(s.name)}</div>
-        <div class="sc-detail">${s.players}人 ${s.format}${s.rule ? " / " + esc(s.rule) : ""}${uma ? "<br>" + uma : ""}${chip ? (uma ? " ／ " : "<br>") + chip : ""}</div>
+        <div class="sc-detail">${s.players}人 ${s.format}${s.rule ? " / " + esc(s.rule) : ""}${uma ? "<br>" + uma : ""}${chip ? (uma ? " ／ " : "<br>") + chip : ""}${fees ? "<br>" + fees : ""}</div>
       </div>
       <div class="sc-actions">
         <button class="btn-ghost" onclick="editShop(${s.id})">編集</button>
@@ -2090,6 +2131,10 @@
           shopData?.chipUnit || "";
         document.getElementById("sf-chip-note").value =
           shopData?.chipNote || "";
+        document.getElementById("sf-game-fee").value =
+          shopData?.gameFee || "";
+        document.getElementById("sf-top-prize").value =
+          shopData?.topPrize || "";
         document.getElementById("sf-editing-id").value = shopData?.id || "";
         const panel = document.getElementById("shop-form-panel");
         panel.style.display = "";
@@ -2108,7 +2153,7 @@
       function saveShop() {
         const name = document.getElementById("sf-name").value.trim();
         if (!name) {
-          showToast("店舗名を入力してください");
+          showToast("店舗名���入力してください");
           return;
         }
         const players = parseInt(document.getElementById("sf-players").value);
@@ -2121,6 +2166,10 @@
         const chipUnit =
           parseInt(document.getElementById("sf-chip-unit").value) || 0;
         const chipNote = document.getElementById("sf-chip-note").value.trim();
+        const gameFee =
+          parseInt(document.getElementById("sf-game-fee").value) || 0;
+        const topPrize =
+          parseInt(document.getElementById("sf-top-prize").value) || 0;
         const uma =
           u1 || u2 || u3 || u4
             ? {
@@ -2145,6 +2194,8 @@
               uma,
               chipUnit,
               chipNote,
+              gameFee,
+              topPrize,
             };
         } else {
           shops.push({
@@ -2156,6 +2207,8 @@
             uma,
             chipUnit,
             chipNote,
+            gameFee,
+            topPrize,
           });
         }
         saveShops(shops);
