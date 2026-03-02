@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mahjong-score-v1';
+const CACHE_NAME = 'mahjong-score-v2';
 
 // キャッシュするファイル一覧
 const STATIC_ASSETS = [
