@@ -1059,8 +1059,8 @@
                 <input type="text" id="s-shop" placeholder="例：○○雀荘" />
               </div>
               <div class="fg">
-                <label>レート・メモ（任意）</label>
-                <input type="text" id="s-rule" placeholder="例：0.5点5円" />
+                <label>レート（任意）</label>
+                <select id="s-rule"></select>
               </div>
             </div>
             <div class="g2">
@@ -1160,6 +1160,7 @@
             <option value="4">四人</option>
             <option value="3">三人</option>
           </select>
+          <select class="fsel" id="f-rate" onchange="renderHistory()"></select>
           <select class="fsel" id="f-sort" onchange="renderHistory()">
             <option value="new">新しい順</option>
             <option value="old">古い順</option>
@@ -1238,12 +1239,8 @@
             </div>
           </div>
           <div class="fg" style="margin-bottom: 4px">
-            <label>レート・その他メモ（任意）</label>
-            <input
-              type="text"
-              id="sf-rule"
-              placeholder="例：0.5点5円、ハコ1000点"
-            />
+            <label>レート（任意）</label>
+            <select id="sf-rule"></select>
           </div>
 
           <hr class="div" />
@@ -1381,8 +1378,21 @@
 
       let cur = null;
 
+      function initRateSelects() {
+        let sessionOpts = '<option value="">未設定</option>';
+        let filterOpts = '<option value="all">全レート</option>';
+        for (let i = 1; i <= 50; i++) {
+          sessionOpts += `<option value="${i}">${i}点</option>`;
+          filterOpts += `<option value="${i}">${i}点</option>`;
+        }
+        document.getElementById("s-rule").innerHTML = sessionOpts;
+        document.getElementById("sf-rule").innerHTML = sessionOpts;
+        document.getElementById("f-rate").innerHTML = filterOpts;
+      }
+
       document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("s-date").value = today();
+        initRateSelects();
         initTabs();
         updateTopStats();
         populateShopPreset();
@@ -1462,7 +1472,7 @@
         const date = document.getElementById("s-date").value || today();
         const players = parseInt(document.getElementById("s-players").value);
         const format = document.getElementById("s-format").value;
-        const rule = document.getElementById("s-rule").value.trim();
+        const rule = document.getElementById("s-rule").value;
         const presetId = document.getElementById("s-shop-preset").value;
         const shopData = presetId
           ? loadShops().find((s) => s.id == presetId)
@@ -1658,9 +1668,11 @@
 
       function renderHistory() {
         const fp = document.getElementById("f-players").value;
+        const fr = document.getElementById("f-rate").value;
         const fs = document.getElementById("f-sort").value;
         let data = loadSessions();
         if (fp !== "all") data = data.filter((s) => s.players == fp);
+        if (fr !== "all") data = data.filter((s) => s.rule == fr);
         if (fs === "old") data.sort((a, b) => a.date.localeCompare(b.date));
         else if (fs === "balH")
           data.sort((a, b) => (b.net || b.balance) - (a.net || a.balance));
@@ -1699,7 +1711,7 @@
       <div class="sh">
         <div>
           <div class="sh-shop">${esc(s.shop)}</div>
-          <div class="sh-meta">${s.date}　${s.players}人 ${s.format}${s.rule ? " / " + esc(s.rule) : ""}</div>
+          <div class="sh-meta">${s.date}　${s.players}人 ${s.format}${s.rule ? " / " + (/^\d+$/.test(s.rule) ? "レート" + s.rule + "点" : esc(s.rule)) : ""}</div>
         </div>
         <div class="sh-right">
           <div class="sh-bal ${bc(net)}">${fn(net)}</div>
@@ -2026,7 +2038,7 @@
         }
         const players = parseInt(document.getElementById("sf-players").value);
         const format = document.getElementById("sf-format").value;
-        const rule = document.getElementById("sf-rule").value.trim();
+        const rule = document.getElementById("sf-rule").value;
         const u1 = document.getElementById("sf-u1").value;
         const u2 = document.getElementById("sf-u2").value;
         const u3 = document.getElementById("sf-u3").value;
