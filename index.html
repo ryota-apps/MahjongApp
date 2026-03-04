@@ -2763,12 +2763,38 @@
     </script>
 
     <script>
-      // Service Worker 登録（PWA オフライン対応）
+      // Service Worker 登録（PWA オフライン対応・自動更新）
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker
             .register("./sw.js")
+            .then((registration) => {
+              // 新しい SW が見つかったらインストール → アクティベートを監視
+              registration.addEventListener("updatefound", () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener("statechange", () => {
+                  if (
+                    newWorker.state === "activated" &&
+                    navigator.serviceWorker.controller
+                  ) {
+                    // 新 SW がアクティブになったらページをリロードして最新を反映
+                    window.location.reload();
+                  }
+                });
+              });
+              // 1時間ごとに SW の更新をチェック
+              setInterval(() => registration.update(), 60 * 60 * 1000);
+            })
             .catch((err) => console.warn("SW registration failed:", err));
+
+          // controllerchange: 別タブ等で SW が切り替わった場合もリロード
+          let reloading = false;
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (!reloading) {
+              reloading = true;
+              window.location.reload();
+            }
+          });
         });
       }
     </script>
