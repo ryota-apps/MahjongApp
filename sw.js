@@ -1,4 +1,5 @@
-const CACHE_NAME = 'mahjong-score-v2';
+const CACHE_VERSION = '3';
+const CACHE_NAME = `mahjong-score-v${CACHE_VERSION}`;
 
 // キャッシュするファイル一覧
 const STATIC_ASSETS = [
@@ -14,15 +15,17 @@ const FONT_DOMAINS = [
   'fonts.gstatic.com'
 ];
 
-// インストール時：静的ファイルをキャッシュ
+// インストール時：静的ファイルをキャッシュ（HTTPキャッシュをバイパスして最新を取得）
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then(cache =>
+      cache.addAll(STATIC_ASSETS.map(url => new Request(url, { cache: 'no-cache' })))
+    )
   );
   self.skipWaiting();
 });
 
-// アクティベート時：古いキャッシュを削除
+// アクティベート時：古いキャッシュを削除し、すべてのクライアントを制御下に置く
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -31,9 +34,8 @@ self.addEventListener('activate', event => {
           .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // フェッチ時：キャッシュ戦略
@@ -56,17 +58,33 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // アプリ本体 → ネットワーク優先、失敗時はキャッシュ
+  // ナビゲーションリクエスト（HTMLページ）→ HTTPキャッシュをバイパスして常に最新を取得
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-cache' })
+        .then(response => {
+          if (response && response.status === 200) {
+            const toCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(event.request).then(cached => cached || caches.match('./index.html'))
+        )
+    );
+    return;
+  }
+
+  // その他のアプリコンテンツ → ネットワーク優先、失敗時はキャッシュ
   event.respondWith(
     fetch(event.request).then(response => {
-      // 正常なレスポンスをキャッシュに保存して返す
       if (response && response.status === 200 && response.type === 'basic') {
         const toCache = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, toCache));
       }
       return response;
     }).catch(() => {
-      // オフライン時はキャッシュから返す
       return caches.match(event.request).then(cached => {
         if (cached) return cached;
         if (event.request.mode === 'navigate') {
