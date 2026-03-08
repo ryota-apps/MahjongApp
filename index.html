@@ -309,6 +309,26 @@
       .btn-ghost:hover {
         background: var(--paper-dark);
       }
+      .btn-date-preset {
+        background: none;
+        border: 1px solid rgba(26, 18, 8, 0.22);
+        font-family: "Noto Serif JP", serif;
+        font-size: 0.76rem;
+        padding: 5px 10px;
+        border-radius: 2px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .btn-date-preset:hover {
+        background: var(--paper-dark);
+      }
+      .btn-date-preset.active {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
       .btn-red {
         background: none;
         border: 1px solid var(--red);
@@ -798,12 +818,12 @@
         fill: var(--red);
       }
       .chart-lbl {
-        font-size: 9px;
+        font-size: 12px;
         fill: #aaa;
         font-family: "Noto Serif JP", serif;
       }
       .chart-val {
-        font-size: 8px;
+        font-size: 12px;
         font-family: "Shippori Mincho", serif;
         font-weight: 700;
       }
@@ -1196,30 +1216,11 @@
             <option value="0">ゲーム代・場代なし</option>
             <option value="1" selected>ゲーム代・場代あり</option>
           </select>
-          <div
-            style="
-              display: flex;
-              gap: 4px;
-              align-items: center;
-              font-size: 0.75rem;
-              color: #777;
-            "
-          >
-            <input
-              type="date"
-              id="f-date-start"
-              class="fsel"
-              style="padding: 3px 5px"
-              onchange="renderHistory()"
-            />
-            <span>～</span>
-            <input
-              type="date"
-              id="f-date-end"
-              class="fsel"
-              style="padding: 3px 5px"
-              onchange="renderHistory()"
-            />
+          <div style="display:flex;gap:4px;flex-wrap:wrap;" id="hist-date-presets">
+            <button class="btn-date-preset active" onclick="setHistoryDateRange('all')">全期間</button>
+            <button class="btn-date-preset" onclick="setHistoryDateRange('thisMonth')">今月</button>
+            <button class="btn-date-preset" onclick="setHistoryDateRange('lastMonth')">先月</button>
+            <button class="btn-date-preset" onclick="setHistoryDateRange('3months')">直近3ヶ月</button>
           </div>
           <select class="fsel" id="f-sort" onchange="renderHistory()">
             <option value="new">新しい順</option>
@@ -1315,30 +1316,11 @@
             <option value="0">ゲーム代・場代なし</option>
             <option value="1" selected>ゲーム代・場代あり</option>
           </select>
-          <div
-            style="
-              display: flex;
-              gap: 4px;
-              align-items: center;
-              font-size: 0.75rem;
-              color: #777;
-            "
-          >
-            <input
-              type="date"
-              id="an-date-start"
-              class="fsel"
-              style="padding: 3px 5px"
-              onchange="renderAnalysis()"
-            />
-            <span>～</span>
-            <input
-              type="date"
-              id="an-date-end"
-              class="fsel"
-              style="padding: 3px 5px"
-              onchange="renderAnalysis()"
-            />
+          <div style="display:flex;gap:4px;flex-wrap:wrap;" id="an-date-presets">
+            <button class="btn-date-preset active" onclick="setAnalysisDateRange('all')">全期間</button>
+            <button class="btn-date-preset" onclick="setAnalysisDateRange('thisMonth')">今月</button>
+            <button class="btn-date-preset" onclick="setAnalysisDateRange('lastMonth')">先月</button>
+            <button class="btn-date-preset" onclick="setAnalysisDateRange('3months')">直近3ヶ月</button>
           </div>
         </div>
         <div class="a-card" style="margin-bottom: 13px">
@@ -1882,6 +1864,47 @@
         );
       }
 
+      // --- Date range state ---
+      let historyDateRange = { start: null, end: null };
+      let analysisDateRange = { start: null, end: null };
+
+      function calcDateRange(preset) {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        if (preset === "thisMonth") {
+          const start = new Date(now.getFullYear(), now.getMonth(), 1);
+          const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          return { start: fmt(start), end: fmt(end) };
+        }
+        if (preset === "lastMonth") {
+          const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          const end = new Date(now.getFullYear(), now.getMonth(), 0);
+          return { start: fmt(start), end: fmt(end) };
+        }
+        if (preset === "3months") {
+          const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+          return { start: fmt(start), end: fmt(now) };
+        }
+        return { start: null, end: null };
+      }
+
+      function setHistoryDateRange(preset) {
+        historyDateRange = calcDateRange(preset);
+        document.querySelectorAll("#hist-date-presets .btn-date-preset").forEach((b) => {
+          b.classList.toggle("active", b.getAttribute("onclick").includes(`'${preset}'`));
+        });
+        renderHistory();
+      }
+
+      function setAnalysisDateRange(preset) {
+        analysisDateRange = calcDateRange(preset);
+        document.querySelectorAll("#an-date-presets .btn-date-preset").forEach((b) => {
+          b.classList.toggle("active", b.getAttribute("onclick").includes(`'${preset}'`));
+        });
+        renderAnalysis();
+      }
+
       function renderHistory() {
         const fp = document.getElementById("f-players").value;
         const fg = document.getElementById("f-gametype").value;
@@ -1889,8 +1912,8 @@
         const fs = document.getElementById("f-sort").value;
         const ff = document.getElementById("f-fee").value === "1";
         const fshop = document.getElementById("f-shop").value;
-        const fDateStart = document.getElementById("f-date-start").value;
-        const fDateEnd = document.getElementById("f-date-end").value;
+        const fDateStart = historyDateRange.start;
+        const fDateEnd = historyDateRange.end;
 
         let allSessions = loadSessions();
 
@@ -2072,8 +2095,8 @@
         const anPlayers = document.getElementById("an-players").value;
         const anShop = document.getElementById("an-shop-filter").value;
         const anRate = document.getElementById("an-rate").value;
-        const startDate = document.getElementById("an-date-start").value;
-        const endDate = document.getElementById("an-date-end").value;
+        const startDate = analysisDateRange.start;
+        const endDate = analysisDateRange.end;
 
         let rawAll = loadSessions();
 
@@ -2120,16 +2143,16 @@
             '<div style="color:#ccc;font-size:0.8rem;text-align:center;padding:20px 0;">データなし</div>';
           return;
         }
-        const sorted = [...sessions].sort(
-          (a, b) => a.date.localeCompare(b.date) || a.id - b.id,
-        );
+        const sorted = [...sessions]
+          .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+          .slice(-6);
         let running = 0;
         const pts = sorted.map((s, i) => {
           running += s.net !== undefined ? s.net : s.balance;
           return { i, val: running, label: s.date.slice(5) };
         });
         const W = 600,
-          H = 150,
+          H = 190,
           PL = 48,
           PR = 10,
           PT = 18,
